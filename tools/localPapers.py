@@ -1,4 +1,4 @@
-# from server import mcp
+from server import mcp
 
 import pymupdf4llm
 
@@ -33,6 +33,8 @@ class FAISSRetriever():
             chunk_size=400,
             chunk_overlap=100)
         
+        self.embed_model = "mxbai-embed-large"
+
         self.top_k = 10
         self.d_th = 0.5
 
@@ -67,37 +69,46 @@ class FAISSRetriever():
 
         return chunks
 
-x = FAISSRetriever('cvpr2025')
-txt_idxs = [23, 125, 1337]
-y = x.retrieve_paper_filepaths(txt_idxs)
-print(y)
-z = x.retrieve_paper_context_chunks(txt_idxs)
-print(z)
+# x = FAISSRetriever('cvpr2025')
+# txt_idxs = [23, 125, 1337]
+# y = x.retrieve_paper_filepaths(txt_idxs)
+# print(y)
+# z = x.retrieve_paper_context_chunks(txt_idxs)
+# print(z)
 
-# @mcp.resource()
-# async def search_relevant_papers(query:str) -> str:
-#     """
-#     Retrieves relevant papers from document database based on query.
+retriever = FAISSRetriever("cvpr2025")
 
-#     Args:
-#         query (str): The search query to find relevant papers.
+@mcp.tool()
+async def search_relevant_papers(query:str) -> str:
+    """
+    Retrieves relevant papers from document database based on query.
 
-#     Returns:
-#         str: List of filenames of papers to fit relevance.
-#     """
+    Args:
+        query (str): The search query to find relevant papers.
+
+    Returns:
+        str: List of filenames of papers to fit relevance.
+    """
+    emb = ollama.embed(model=retriever.embed_model, input=query)["embeddings"][0]
+    top_chunks = retriever.find_top_chunks(emb)
+    top_files = retriever.retrieve_paper_filepaths(top_chunks)
     
-#     return str()
+    return str(top_files)
 
 
-# @mcp.resource()
-# async def search_relevant_info(query:str) -> str:
-#     """
-#     Retrieves relevant paper contents from document database based on query.
+@mcp.tool()
+async def search_relevant_info(query:str) -> str:
+    """
+    Retrieves relevant paper contents from document database based on query.
 
-#     Args:
-#         query (str): The search query to find relevant papers.
+    Args:
+        query (str): The search query to find relevant papers.
 
-#     Returns:
-#         str: Concatenated text content from retrieved papers.
-#     """
-#     return str()
+    Returns:
+        str: Concatenated text content from retrieved papers.
+    """
+    emb = ollama.embed(model=retriever.embed_model, input=query)["embeddings"][0]
+    top_chunks = retriever.find_top_chunks(emb)
+    top_chunks = retriever.retrieve_paper_context_chunks(top_chunks)
+
+    return str(top_chunks)

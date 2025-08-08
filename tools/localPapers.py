@@ -1,3 +1,6 @@
+import logging
+from typing import List
+
 from server import mcp
 
 import pymupdf4llm
@@ -39,9 +42,11 @@ class FAISSRetriever():
         self.d_th = 0.5
 
     def find_top_chunks(self, query):
-        distances, top_k_idxs = self.index.search(query, self.top_k)
+        s = self.index.search(np.array(query), self.top_k)
+        distances, top_k_idxs = s
         out_idxs = []
-        for idx, dist in zip(top_k_idxs, distances):
+        for idx, dist in zip(top_k_idxs[0], distances[0]):
+            print(idx, dist)
             if dist <= self.d_th:
                 out_idxs.append(idx)
 
@@ -67,7 +72,7 @@ class FAISSRetriever():
 
             chunks.append(chunk)
 
-        return chunks
+        return(chunks)
 
 # x = FAISSRetriever('cvpr2025')
 # txt_idxs = [23, 125, 1337]
@@ -75,6 +80,7 @@ class FAISSRetriever():
 # print(y)
 # z = x.retrieve_paper_context_chunks(txt_idxs)
 # print(z)
+
 
 retriever = FAISSRetriever("cvpr2025")
 
@@ -89,11 +95,12 @@ async def search_relevant_papers(query:str) -> str:
     Returns:
         str: List of filenames of papers to fit relevance.
     """
-    emb = ollama.embed(model=retriever.embed_model, input=query)["embeddings"][0]
+    emb = ollama.embed(model=retriever.embed_model, input=query)["embeddings"]
     top_chunks = retriever.find_top_chunks(emb)
     top_files = retriever.retrieve_paper_filepaths(top_chunks)
+    out = "\n".join(top_files)
     
-    return str(top_files)
+    return(out)
 
 
 @mcp.tool()
@@ -107,8 +114,28 @@ async def search_relevant_info(query:str) -> str:
     Returns:
         str: Concatenated text content from retrieved papers.
     """
-    emb = ollama.embed(model=retriever.embed_model, input=query)["embeddings"][0]
+    emb = ollama.embed(model=retriever.embed_model, input=query)["embeddings"]
     top_chunks = retriever.find_top_chunks(emb)
     top_chunks = retriever.retrieve_paper_context_chunks(top_chunks)
+    out = "\n".join(top_chunks)
 
-    return str(top_chunks)
+    return(out)
+
+@mcp.tool()
+async def retrieve_paper_contents(filepath:str) -> List[str]:
+    """
+    Retrieves relevant paper contents from document database based on query.
+
+    Args:
+        filepath (str): Local filepath of file of mcp-side system.
+        This should match return from search_relevant_papers
+
+    Returns:
+        List[str]: List containing text contents of paper grouped by page
+    """
+    paper_data = pymupdf4llm.to_markdown(
+        filepath,
+        ignore_images=True,
+        ignore_graphics=True)
+
+    return paper_data

@@ -121,6 +121,8 @@ async def search_relevant_info(query:str) -> str:
 
     return(out)
 
+
+# This is a bad idea as you can probably inject to get the contents of ANY pdf on the local filesystem of the mcp
 @mcp.tool()
 async def retrieve_paper_contents(filepath:str) -> List[str]:
     """
